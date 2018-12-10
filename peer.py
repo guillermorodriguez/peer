@@ -3,6 +3,48 @@ import socket
 import threading
 import time
 
+"""
+    @Author:    Guillermo Rodriguez
+    @Created:   2018.11.08
+    @Purpose:   Manage client socket communication
+"""
+class client(threading.Thread):
+
+    """
+        @Author:    Guillermo Rodriguez
+        @Created:   2018.11.08
+        @Purpose:   Client constructor
+    """
+    def __init__(self, host, port, id):
+        threading.Thread.__init__(self)
+
+        self.host = host
+        self.port = port
+        self.id = id
+        self.bytes = 1024
+
+    """
+        @Author:    Guillermo Rodriguez
+        @Created:   2018.11.08
+        @Purpose:   Main class thread
+    """
+    def run(self):
+        print("Client Session Started ....")
+
+        _client = socket.socket()
+        _client.connect((self.host, self.port))
+
+        print("Commands: Query:[Text] | Quit")
+        message = input(">> ")
+        while message.lower().strip() != 'quit':
+            _client.send(message.encode())
+            response = _client.recv(self.bytes).decode()
+
+            print(response)
+
+            message = input(">> ")
+
+        print("Client Session Terminated ....")
 
 """
     @Author:    Guillermo Rodriguez
@@ -13,7 +55,7 @@ class server(threading.Thread):
     """
         @Author:    Guillermo Rodriguez
         @Created:   2018.11.08
-        @Purpose:   Constructor
+        @Purpose:   Server constructor
     """
     def __init__(self, host, port, id):
         threading.Thread.__init__(self)
@@ -42,7 +84,8 @@ class server(threading.Thread):
                         print("Data Received ....")
                         print(data.decode())
 
-                        #connection.sendall(data)
+                        response = "Processing Command"
+                        connection.sendall(str.encode(response))
                     else:
                         break;
 
@@ -65,5 +108,10 @@ class server(threading.Thread):
 if __name__ == "__main__":
     print("Starting Peer ....")
 
+    # Start Server Instance
     server('127.0.0.1', 9000, 1).start()
+
+    # Start Client Instance
+    client('127.0.0.1', 9000, 1).start()
+
     print("Server Invoked ....")

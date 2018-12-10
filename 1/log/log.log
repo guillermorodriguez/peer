@@ -1,0 +1,6 @@
+Test Results
+Login:1,127.0.0.1-9001
+Sync:1:1.file1.txt,1.file10.txt,1.file2.txt,1.file3.txt,1.file4.txt,1.file5.txt,1.file6.txt,1.file7.txt,1.file8.txt,1.file9.txt
+GOOD
+Get:1:2.file20.txt
+CLIENT:127.0.0.1-9002
