@@ -2,6 +2,8 @@
 import socket
 import threading
 import time
+import argparse
+import os
 
 """
     @Author:    Guillermo Rodriguez
@@ -15,13 +17,20 @@ class client(threading.Thread):
         @Created:   2018.11.08
         @Purpose:   Client constructor
     """
-    def __init__(self, host, port, id):
+    def __init__(self, id):
         threading.Thread.__init__(self)
 
-        self.host = host
-        self.port = port
+        self.host = '127.0.0.1'
+        self.port = 9000
         self.id = id
         self.bytes = 1024
+
+        self.nodes = []
+        with open(str(self.id) + ".txt", 'r') as _file:
+            for line in _file:
+                self.nodes.append(int(line.rstrip('\n')))
+
+        self.log = str(self.id) + "/log/log.log"
 
     """
         @Author:    Guillermo Rodriguez
@@ -31,20 +40,41 @@ class client(threading.Thread):
     def run(self):
         print("Client Session Started ....")
 
-        _client = socket.socket()
-        _client.connect((self.host, self.port))
-
         print("Commands: Query:[Text] | Quit")
         message = input(">> ")
         while message.lower().strip() != 'quit':
-            _client.send(message.encode())
-            response = _client.recv(self.bytes).decode()
 
-            print(response)
+            if "query" in message.lower():
+                for node in self.nodes:
+
+                    _mode = 'w'
+                    if os.path.exists(self.log):
+                        _mode = 'a'
+
+                    _logit = open(self.log, _mode)
+                    _logit.write(message + '\n')
+                    _logit.close()
+
+                    _client = socket.socket()
+                    _client.connect((self.host, self.port+node))
+                    _client.send(message.lower().encode())
+                    response = _client.recv(self.bytes).decode()
+
+                    _client.close()
+
+                    if "FILE:" in response:
+                        response = response.replace('FILE:', '')
+                        with open(str(self.id) + "/" + message.lower().replace('query:', ''), 'w') as _target:
+                            _target.write(response)
+
+                    _logit = open(self.log, _mode)
+                    _logit.write(response + '\n')
+                    _logit.close()
 
             message = input(">> ")
 
         print("Client Session Terminated ....")
+        exit()
 
 """
     @Author:    Guillermo Rodriguez
@@ -57,13 +87,18 @@ class server(threading.Thread):
         @Created:   2018.11.08
         @Purpose:   Server constructor
     """
-    def __init__(self, host, port, id):
+    def __init__(self, id):
         threading.Thread.__init__(self)
 
-        self.host = host
-        self.port = port
+        self.host = '127.0.0.1'
+        self.port = 9000+id
         self.id = id
         self.bytes = 1024
+
+        self.nodes = []
+        with open(str(self.id) + ".txt", 'r') as _file:
+            for line in _file:
+                self.nodes.append(int(line.rstrip('\n')))
 
     """
         @Author:    Guillermo Rodriguez
@@ -82,10 +117,38 @@ class server(threading.Thread):
                     data = connection.recv(self.bytes)
                     if data:
                         print("Data Received ....")
-                        print(data.decode())
+                        query = data.decode().replace('query:', '')
+                        print("Searching File .... %s" % query)
 
-                        response = "Processing Command"
-                        connection.sendall(str.encode(response))
+                        content = ''
+                        for _file in os.listdir(str(self.id)+"/"):
+                            if _file == query:
+                                print("File Found")
+                                with open(str(self.id)+"/"+_file, 'r') as _target:
+                                    content = _target.read()
+                                break
+
+                        if len(content) > 0:
+                            connection.sendall(str.encode("FILE:"+content))
+                        else:
+                            # Route to Peers
+                            for node in self.nodes:
+                                _client = socket.socket()
+                                _client.connect((self.host, self.port+node))
+                                _client.send(message.lower().encode())
+                                content = _client.recv(self.bytes).decode()
+
+                                _client.close()
+
+                                if len(content) > 0:
+                                    break
+
+                            if len(content) > 0:
+                                connection.sendall(str.encode("FILE:"+content))
+                            else:
+                                connection.sendall(str.encode("NOTFOUND"))
+
+
                     else:
                         break;
 
@@ -106,12 +169,20 @@ class server(threading.Thread):
 
 
 if __name__ == "__main__":
-    print("Starting Peer ....")
 
-    # Start Server Instance
-    server('127.0.0.1', 9000, 1).start()
+    parser = argparse.ArgumentParser(prog='peer.py')
+    parser.add_argument('-id', help='Client ID Number')
+    parse = parser.parse_args()
 
-    # Start Client Instance
-    client('127.0.0.1', 9000, 1).start()
+    if parse.id:
+        print("Starting Peer ....")
 
-    print("Server Invoked ....")
+        # Start Server Instance
+        server(int(parse.id)).start()
+
+        # Start Client Instance
+        client(int(parse.id)).start()
+
+        print("Server Invoked ....")
+    else:
+        parser.print_help()
